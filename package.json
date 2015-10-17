@@ -1,0 +1,23 @@
+{
+  "name" : "L-Spiel",
+  "license": "MIT",
+  "version" : "1.0.0",
+  "repository" : {
+    "type" : "git",
+    "url" : "https://github.com/frohmut/lspiel.git"
+  },
+  "description" : "Brettspiel inspiriert von Hero Quest",
+  "author" : "Janek & Patrick Maass",
+  "scripts": {
+    "test": "node_modules/.bin/eslint -c .eslintrc lspiel.js compile.js"
+  },
+  "devDependencies": {
+    "eslint": "latest",
+    "eslint-plugin-react": "latest",
+    "react": ">=0.14",
+    "react-dom": ">=0.14",
+    "browserify": "latest",
+    "babel": "latest",
+    "babelify": "latest"
+  }
+}

@@ -1,0 +1,47 @@
+/* the board consists for rows */
+.tileRow {
+	display: flex;
+	flex-direction: row;
+	height: 32px;
+}
+/* each board-rows has #cols tiles */
+.tile {
+	width: 30px;
+	height: 30px;
+	background: blue;
+	border: 1px solid darkblue;
+}
+/* representation of walls */
+.tile-north-W {
+	border-top: 1px solid white;
+}
+.tile-east-W {
+	border-right: 1px solid white;
+}
+.tile-south-W {
+	border-bottom: 1px solid white;
+}
+.tile-west-W {
+	border-left: 1px solid white;
+}
+/* rep. of closed doors */
+.tile-east-D {
+	border-right: 1px solid brown;
+}
+.tile-west-D {
+	border-left: 1px solid brown;
+}
+.tile-south-D {
+	border-bottom: 1px solid brown;
+}
+.tile-north-D {
+	border-top: 1px solid brown;
+}
+/* message area */
+.message {
+	height: 30px;
+}
+.turn-message {
+	display: flex;
+	align-items: center;
+}
