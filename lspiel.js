@@ -687,6 +687,11 @@ var LGame = React.createClass({
             continue;
           }
         }
+        /* Andere Figuren sind Hindernisse. Ausnahme ist das Ziel.
+         * Wenn das Ziel eine Figur ist, so wird dies als
+         * Angriff aufgefasst und es soll der Pfad zum Ziel
+         * gefunden werden.
+         * */
         if (nc.x != to.x || nc.y != to.y) {
           if (this.board.tiles[nc.x][nc.y].sprite) {
             if (this.board.tiles[nc.x][nc.y].sprite.active) {
