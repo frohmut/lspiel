@@ -9,7 +9,7 @@
  *   - Board: Liste von Reihen von Feldern
  *   - BoardRow: Layout-Hilfe: 1 Reihe von Feldern
  *   - Tile: 1 Feld, inklusive Bild, Wänden und Türen
- *   - Pic: Bild eines Helden/Gegners/Hindernisses/etc. auf einem Feld
+ *   - Pic: Bild eines Helden/Monsters/Hindernisses/etc. auf einem Feld
  *   - Message: Statusanzeige / Hinweise
  * */
 
@@ -535,12 +535,7 @@ var LGame = React.createClass({
   actionStartMove: function (who) {
     this.actionInit();
     this.useTurn(who);
-    if (who.type == "monster") {
-      this.board.message = "Wohin soll der Gegner?";
-    }
-    else {
-      this.board.message = who.name + ": Wohin willst Du gehen?";
-    }
+    this.board.message = "Wohin soll der " + who.name + " gehen?";
     this.actionFinally();
   },
   actionSetMessage: function (message) {

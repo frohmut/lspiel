@@ -3,7 +3,7 @@ L-Spiel
 Ein (HTML-)-Brett-Spiel entwickelt auf einer
 mehrstündigen Bahnfahrt von Janek und Patrick.
 Erweiterungen und Verbesserungen erfolgten
-in den Tagen darauf.
+durch Janek, Saskia und Patrick in den Tagen darauf.
 
 Entwicklung:
 
