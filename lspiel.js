@@ -26,7 +26,7 @@ if (typeof React == 'undefined') {
 var LGame = React.createClass({
   board: {},
   animation: -1,
-  pending: null,
+  pending: [],
 
   addWalls: function (board, w) {
     for (var i = 0; i < w.length; i++) {
@@ -244,15 +244,40 @@ var LGame = React.createClass({
           pic: "gf.png",
         },
         {
-          x: 2, y: 0,
-          name: "Goblin", type: "monster",
-          pic: "goblin.png",
-        },
-        {
           x: 0, y: 2,
           name: "Zwerg", type: "hero",
           lives: 7, reach: 1,
           pic: "zwerg.png",
+        },
+        {
+          x: 2, y: 0,
+          name: "Goblin", type: "monster",
+          pic: "goblin.png",
+          play: function () {
+            var p = this.findPath(this.coord, {}, function (coord) {
+              var sp = this.getSprite(coord);
+              if (sp && sp.type == "hero") {
+                return true;
+              }
+              else {
+                return false;
+              }
+            }.bind(this));
+            var actions = [];
+            if (!p) {
+              // nothing
+            }
+            else if (p.length == 1) {
+              actions.push({action: "attack", coord: p[0]});
+            }
+            else {
+              var theHero = p.pop();
+              var atHero = p.pop();
+              actions.push({action: "move", coord: atHero});
+              actions.push({action: "attack", coord: theHero});
+            }
+            return actions;
+          },
         },
         {
           x: 25, y: 0,
@@ -275,21 +300,28 @@ var LGame = React.createClass({
           ignoreObstacles: { 'walls': true },
           pic: "orc.png",
 
-          /* automatisch fahren */
+          // automatisch fahren
           play: function () {
+            var actions = [];
             var z = this.findEnemy("Zwerg");
             var target = {
               x: z.coord.x,
               y: 0,
             };
-            var p = this.findPath(this.coord, target, { 'walls': true});
-            if (p && p.length <= 8) {
-              this.moveXY(target.x, target.y);
+            var p = this.findPathTo(this.coord, target, { 'walls': true});
+            var zp = this.findPathTo(this.coord, z.coord, {});
+            if (zp && (z.coord.x == this.coord.x || z.coord.y == this.coord.y)) {
+              actions.push({action: "attack", coord: z.coord});
+            }
+            else if (p && p.length <= 8) {
+              actions.push({action: "move", coord: target});
+              actions.push({action: "attack", coord: z.coord});
             }
             else if (p) {
               var s = p[8];
-              this.moveXY(s.x, s.y);
+              actions.push({action: "move", coord: s});
             }
+            return actions;
           },
 
         },
@@ -303,10 +335,13 @@ var LGame = React.createClass({
       ],
     });
 
-    /* Der erste Figur fängt an. */
-    board.turn = 0;
-
     this.board = board;
+    /* Die erste Figur fängt an. */
+    board.turn = 0;
+    var m = this.board.sprites[1];
+    this.board.moving = m;
+    this.board.message = "Was soll der " + m.name + " machen?";
+
     return {data: this.board };
   },
   receivedData: function () {
@@ -314,10 +349,10 @@ var LGame = React.createClass({
   },
   coordsMatch: function (c1, c2) {
     if (c1.x == c2.x && c1.y == c2.y) {
-      return 1;
+      return true;
     }
     else {
-      return 0;
+      return false;
     }
   },
   coordsSprite: function (coord) {
@@ -352,6 +387,7 @@ var LGame = React.createClass({
     }
   },
   animateMove: function (moving, path) {
+    this.openDoors(path);
     if (path.length > 1) {
       var m = moving;
       var step = 1;
@@ -366,16 +402,48 @@ var LGame = React.createClass({
         if (step >= path.length) {
           clearInterval(this.animation);
           this.animation = -1;
-          if (this.pending) {
-            var p = this.pending;
-            this.pending = null;
+          if (this.pending.length > 0) {
+            var p = this.pending.shift();
             p();
           }
         }
       }.bind(this), 200);
     }
   },
+  animateAttack: function (m, sprite) {
+    this.board.message = "Der " + m.name + " greift den " + sprite.name + " an.";
+    sprite.lives--;
+    if (sprite.lives <= 0) {
+      sprite.active = false;
+
+      var att = this.board.sprites[0];
+      if (att.active == true) {
+        this.board.tiles[att.coord.x][att.coord.y].sprite = null;
+      }
+      att.active = true;
+      att.subtype = sprite.type;
+
+      this.board.tiles[sprite.coord.x][sprite.coord.y].sprite = this.board.sprites[0];
+      att.coord.x = sprite.coord.x;
+      att.coord.y = sprite.coord.y;
+      this.board.message = "Der " + sprite.name + " ist aus dem Spiel.";
+    }
+    else {
+      this.board.message = "Der " + sprite.name + " hat noch " + sprite.lives + " Leben";
+    }
+    this.animateSleep(1000);
+  },
+  animateSleep: function (ms) {
+    this.animation = setTimeout(function () {
+      this.animation = -1;
+      if (this.pending.length > 0) {
+        var p = this.pending.shift();
+        p();
+      }
+    }.bind(this), ms);
+  },
   tryMoveTo: function (coord) {
+    var didAnimate = false;
     var sp = this.coordsSprite(coord);
     var m = this.board.moving;
     if (sp !== null && m != sp && sp.type != "attack") {
@@ -398,16 +466,31 @@ var LGame = React.createClass({
             'stones': true,
           };
         }
-        var attackPossible = this.findPath(sp.coord, m.coord, ignoreObstacles);
-        if (!attackPossible) {
+        var attackPath = this.findPathTo(sp.coord, m.coord, ignoreObstacles);
+        if (!attackPath) {
           this.doAbortAttack('Kein Pfad gefunden.');
         }
         /* Reicht die Angriffs-Reichweite für den Pfad? */
-        else if (attackPossible.length > m.attack.reach + 1) {
+        else if (attackPath.length > m.attack.reach + 1) {
           this.doAbortAttack('Zu weit weg.');
         }
         else {
-          this.doAttack(sp);
+          /* ist der Pfad entlang der X/Y-Richtung? */
+          var attackOK = true;
+          if (m.attack.area == 'XY') {
+            var dir = coord.x == m.coord.x ? 'x' : 'y';
+            for (var i = 0; i < attackPath.length; i++) {
+              if (attackPath[i][dir] != m.coord.x) {
+                this.doAbortAttack('Kein Pfad in der gleichen Zeile/Spalte');
+                attackOK = false;
+                break;
+              }
+            }
+          }
+          if (attackOK) {
+            this.animateAttack(m, sp);
+            didAnimate = true;
+          }
         }
       }
     }
@@ -418,7 +501,7 @@ var LGame = React.createClass({
        */
       if (coord.x == m.coord.x || coord.y == m.coord.y) {
         var d_x, d_y;
-        if (coord.y == m.y) {
+        if (coord.y == m.coord.y) {
           d_x = -1;
           d_y = 0;
           if (m.coord.x > coord.x) { d_x = +1; }
@@ -434,7 +517,7 @@ var LGame = React.createClass({
           y: coord.y + d_y,
         };
 
-        var p = this.findPath(m.coord, to);
+        var p = this.findPathTo(m.coord, to, {});
         if (!p) {
           this.board.message = "Kein Pfad vor den Stein gefunden.";
         }
@@ -443,7 +526,7 @@ var LGame = React.createClass({
             x: coord.x + d_x * -1,
             y: coord.y + d_y * -1,
           };
-          var ps = this.findPath(coord, stoneTo);
+          var ps = this.findPathTo(coord, stoneTo);
           if (!ps) {
             this.board.message = "Stein kann nicht verschoben werden.";
           }
@@ -458,8 +541,33 @@ var LGame = React.createClass({
         this.board.message = "Dieses Feld ist blockiert.";
       }
     }
+    /* anderes Hindernis */
+    else if (this.board.tiles[coord.x][coord.y].block) {
+      this.board.message = "Dieses Feld ist blockiert.";
+    }
     else {
-      this.doMoveTo(coord);
+      var ign = m.move.ignore ? m.move.ignore : null;
+      var mp = this.findPathTo(m.coord, coord, ign);
+      if (mp) {
+        if (mp.length > m.move.range + 1) {
+          this.board.message = "Zu weit weg.";
+        }
+        else {
+          this.animateMove(m, mp);
+          didAnimate = true;
+        }
+      }
+      else {
+        if (this.board.tiles[coord.x][coord.y].block == "stone") {
+          this.board.message = "Dieses Feld ist blockiert.";
+        }
+        else {
+          this.board.message = "Keinen Weg gefunden.";
+        }
+      }
+    }
+    if (!didAnimate) {
+      this.animateSleep(500);
     }
   },
   actionInit: function () {
@@ -474,113 +582,133 @@ var LGame = React.createClass({
   actionFinally: function () {
     this.receivedData();
   },
-  useTurn: function (who) {
-    this.board.moving = who;
-  },
   endTurn: function () {
     var sp;
+    var humans = false;
+    /* gibt es noch menschliche Mitspieler? */
+    for (var i = 1; i < this.board.sprites.length; i++) {
+      var sph = this.board.sprites[i];
+      if (sph.active && !sph.play) {
+        humans = true;
+        break;
+      }
+    }
+    if (!humans) {
+      this.board.message = "Game Over!";
+      return;
+    }
     do {
       this.board.turn = (this.board.turn + 1) % (this.board.sprites.length - 1);
       sp = this.board.sprites[this.board.turn + 1];
     } while (sp.active != true);
 
-    this.board.moving = null;
-    if (sp.play) {
-      /* kann automatisch fahren */
-      if (sp.play) {
-        var game = this;
-        var f = function () {
-          var self = {
-            coord: {
-              x: sp.coord.x,
-              y: sp.coord.y,
-            },
-            findEnemy: function (name) {
-              for (var i = 0; i < game.board.sprites.length; i++) {
-                if (game.board.sprites[i].name == name) {
-                  return game.board.sprites[i];
-                }
-              }
-              return null;
-            },
-            findPath: function (from, to, ignore) {
-              return game.findPath(from, to, ignore);
-            },
-            moveXY: function (x, y) {
-              game.actionMoveFrom({ from: this.coord, to: {x: x, y: y}});
-            },
-          };
-          for (var k in self) {
-            if (typeof k == 'function') {
-              self[k].bind(self);
-            }
-          }
-          sp.play.call(self);
+    this.board.moving = sp;
 
-          /* falls play() nicht zu einem kompletten Zug führt,
-           * dann hier weitersetzen */
-          if (this.board.sprites[this.board.turn + 1] == sp) {
-            this.endTurn();
-          }
-        }.bind(this);
-        if (this.animation) {
-          this.pending = f;
-        }
-        else {
-          f();
-        }
-      }
+    /* falls sp.play gesetzt ist, kann die Figure automatisch fahren */
+    if (sp.play) {
+      this.board.message = "Der " + sp.name + " zieht jetzt.";
+      this.doAutoPlay(sp);
+    }
+    else {
+      this.board.message = "Was soll der " + sp.name + " machen?";
     }
   },
-  actionStartMove: function (who) {
-    this.actionInit();
-    this.useTurn(who);
-    this.board.message = "Wohin soll der " + who.name + " gehen?";
-    this.actionFinally();
+  doAutoPlay: function (sp) {
+    var game = this;
+
+    /* object für den 'this'-Pointer */
+    var player = {
+      coord: {
+        x: sp.coord.x,
+        y: sp.coord.y,
+      },
+      findEnemy: function (name) {
+        for (var i = 0; i < game.board.sprites.length; i++) {
+          if (game.board.sprites[i].name == name) {
+            return game.board.sprites[i];
+          }
+        }
+        return null;
+      },
+      findPathTo: function (from, to, ignore) {
+        return game.findPathTo(from, to, ignore);
+      },
+      findPath: function (from, ignore, match) {
+        return game.findPath(from, ignore, match);
+      },
+      getSprite: function (coord) {
+        return game.coordsSprite(coord);
+      },
+    };
+    for (var k in player) {
+      if (typeof k == 'function') {
+        player[k].bind(self);
+      }
+    }
+    var f = function () {
+
+      var actions = sp.play.call(player);
+  
+      if (actions && actions.length) {
+        /* es sind maximal 2 Aktionen erlaubt */
+        if (actions.length > 0) {
+          this.runAction(sp, actions[0]);
+        }
+        if (actions.length > 1) {
+          this.runAction(sp, actions[1]);
+        }
+      }
+      this.runAction(sp, { action: "endturn" });
+    }.bind(this);
+    if (this.animation != -1) {
+      this.pending.push(f);
+    }
+    else {
+      f();
+    }
   },
-  actionSetMessage: function (message) {
-    this.actionInit();
-    this.board.message = message;
-    this.actionFinally();
+  runAction: function (sp, action) {
+    var f = function () {
+      if (action.action == 'endturn') {
+        var tsp = this.board.sprites[this.board.turn + 1];
+        /* falls sp noch am Zug wäre -> nächster bitte */
+        if (tsp == sp) {
+          this.endTurn();
+        }
+      }
+      else {
+        this.tryMoveTo(action.coord);
+      }
+      this.actionFinally();
+      /* MoveTo kann async auslösen -> startet nächste Funktion,
+       * oder aber nicht -> nächste Funktion wird hier gestartet
+       * */
+      if (this.animation == -1) {
+        if (this.pending.length > 0) {
+          var n = this.pending.shift();
+          n();
+        }
+      }
+    }.bind(this);
+    if (this.animation != -1) {
+      this.pending.push(f);
+    }
+    else {
+      f();
+    }
   },
   doAbortAttack: function (message) {
     this.board.message = "Angriff nicht möglich: " + message;
   },
   actionMoveFrom: function (args) {
     var sp = this.board.tiles[args.from.x][args.from.y].sprite;
-    if (this.board.sprites[this.board.turn + 1] == sp) {
-      this.useTurn(sp);
+    if (this.board.moving == sp) {
       this.actionClick(args.to);
     }
     else {
       this.actionInit();
-      this.actionSetMessage("Der " + this.board.sprites[this.board.turn + 1].name + " ist am Zug.");
+      this.board.message = "Der " + sp.name + " kann nicht. Der " + this.board.moving.name + " ist am Zug.";
       this.actionFinally();
-    }
-  },
-  doMoveTo: function (coord) {
-    var m = this.board.moving;
-    if (!m) {
-      return;
-    }
-    var i = m.move.ignore ? m.move.ignore : null;
-    var p = this.findPath(m.coord, coord, i);
-    if (p) {
-      if (p.length > m.move.range + 1) {
-        this.board.message = "Zu weit weg.";
-      }
-      else {
-        this.openDoors(p);
-        this.animateMove(m, p);
-      }
-    }
-    else {
-      if (this.board.tiles[coord.x][coord.y].block == "stone") {
-        this.board.message = "Dieses Feld ist blockiert.";
-      }
-      else {
-        this.board.message = "Keinen Weg gefunden.";
-      }
     }
   },
   actionClick: function (coord) {
@@ -592,37 +720,7 @@ var LGame = React.createClass({
       this.tryMoveTo(coord);
       this.endTurn();
     }
-    else {
-      var sp = this.coordsSprite(coord);
-      if (sp) {
-        if (this.board.sprites[this.board.turn + 1] == sp) {
-          this.actionStartMove(sp);
-        }
-        else {
-          this.actionSetMessage("Der " + this.board.sprites[this.board.turn + 1].name + " ist am Zug.");
-        }
-      }
-      else {
-        this.actionSetMessage("Hier steht doch niemand.");
-      }
-    }
     this.actionFinally();
-  },
-  doAttack: function (sprite) {
-    sprite.lives--;
-    if (sprite.lives <= 0) {
-      sprite.active = false;
-
-      this.board.sprites[0].active = true;
-      this.board.sprites[0].subtype = sprite.type;
-
-      this.board.tiles[sprite.coord.x][sprite.coord.y].sprite = this.board.sprites[0];
-      this.board.sprites[0].coord.x = sprite.coord.x;
-      this.board.sprites[0].coord.y = sprite.coord.y;
-    }
-    else {
-      this.board.message = "Noch " + sprite.lives + " Leben";
-    }
   },
   coordEvent: function (command, coords) {
     if (command == "click") {
@@ -632,7 +730,16 @@ var LGame = React.createClass({
       this.actionMoveFrom(coords);
     }
   },
-  findPath: function (from, to, ignoreObstacles) {
+  findPathTo: function (from, to, ignoreObstacles) {
+    return this.findPath(from, ignoreObstacles, function (coord) {
+      return this.coordsMatch(to, coord);
+    }.bind(this));
+  },
+  /* Findet einen Pfad von einer Quell-Koordinate (from)
+   * zu einem anderen Feld, für das die Funktion "match" true
+   * zurückliefert.
+   * */
+  findPath: function (from, ignoreObstacles, match) {
     var qp = []; /* queue of paths */
     qp.push([from]);
     var ignore = ignoreObstacles ? ignoreObstacles : {};
@@ -646,7 +753,7 @@ var LGame = React.createClass({
       var p = qp.shift();
       var c = p[p.length - 1];
 
-      if (this.coordsMatch(c, to)) {
+      if (match(c)) {
         found = p;
         break;
       }
@@ -692,9 +799,9 @@ var LGame = React.createClass({
          * Angriff aufgefasst und es soll der Pfad zum Ziel
          * gefunden werden.
          * */
-        if (nc.x != to.x || nc.y != to.y) {
-          if (this.board.tiles[nc.x][nc.y].sprite) {
-            if (this.board.tiles[nc.x][nc.y].sprite.active) {
+        if (this.board.tiles[nc.x][nc.y].sprite) {
+          if (this.board.tiles[nc.x][nc.y].sprite.active) {
+            if (!match(nc)) {
               if (!ignore.sprites) {
                 continue;
               }
