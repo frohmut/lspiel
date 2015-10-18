@@ -638,24 +638,21 @@ var LGame = React.createClass({
     }
   },
   findPath: function (from, to, ignoreObstacles) {
-    var t = { first: null, last: null };
-    t.first = t.last = { val: from, next: null, from: []};
+    var qp = []; /* queue of paths */
+    qp.push([from]);
     var ignore = ignoreObstacles ? ignoreObstacles : {};
 
     var visited = {};
     visited[from.x + "/" + from.y] = true;
 
     var found = null;
-    while (t.first) {
-      var el = t.first;
-      t.first = t.first.next;
-      if (!t.first) {
-        t.last = null;
-      }
-      var c = el.val;
+    while (qp.length > 0) {
+
+      var p = qp.shift();
+      var c = p[p.length - 1];
 
       if (this.coordsMatch(c, to)) {
-        found = el.from.concat(to);
+        found = p;
         break;
       }
       var walls = this.board.tiles[c.x][c.y];
@@ -681,12 +678,6 @@ var LGame = React.createClass({
           x: c.x + dir[k].x,
           y: c.y + dir[k].y,
         };
-        var cnext = {
-          val: nc,
-          next: null,
-          from: el.from.concat(c),
-        };
-
         if (nc.x < 0 || nc.y < 0 ||
             nc.y >= this.board.rows || nc.x >= this.board.cols) {
           continue;
@@ -710,14 +701,7 @@ var LGame = React.createClass({
             }
           }
         }
-
-        if (!t.last) {
-          t.first = t.last = cnext;
-        }
-        else {
-          t.last.next = cnext;
-          t.last = cnext;
-        }
+        qp.push(p.concat(nc));
       }
     }
     return found;
