@@ -104,13 +104,13 @@ var LGame = React.createClass({
         active: true,
         lives: s.lives ? s.lives : 1,
         move: {
-          range: s.range ? s.range : 100,
+          range: s.range ? s.range : -1,
           ignore: s.ignoreObstacles ? s.ignoreObstacles :
                     s.type == "hero" ? { doors: true} : null,
         },
         attack: {
           area: s.attackArea ? s.attackArea : 'XY',
-          reach: s.reach ? s.reach : 100,
+          reach: s.reach ? s.reach : 1,
         },
         pic: s.pic ? s.pic : null,
         play: s.play ? s.play : null,
@@ -307,6 +307,7 @@ var LGame = React.createClass({
           x: 3, y: 3,
           name: "Orc", type: "monster",
           range: 8,
+          reach: 100,
           ignoreObstacles: { 'walls': true },
           pic: "orc.png",
 
@@ -362,12 +363,7 @@ var LGame = React.createClass({
     /* Die erste Figur fängt an. */
     board.turn = 0;
     var m = this.board.sprites[1];
-    this.moving = {
-      sprite: m,
-      canMove: true,
-      canAttack: true,
-    };
-    this.board.message = "Was soll der " + m.name + " machen?";
+    this.setupTurn(m);
 
     /* Sichtbarkeit um die Helden herum */
     for (var i = 1; i < this.board.sprites.length; i++) {
@@ -640,7 +636,7 @@ var LGame = React.createClass({
         }
         /* Reicht die Angriffs-Reichweite für den Pfad? */
         else if (attackPath.length > m.attack.reach + 1) {
-          this.animateAbortAttack('Zu weit weg.');
+          this.animateAbortAttack('Zu weit weg für einen Angriff.');
         }
         else {
           /* ist der Pfad entlang der X/Y-Richtung? */
@@ -664,6 +660,7 @@ var LGame = React.createClass({
   tryMoveTo: function (coord) {
     var sp = this.coordsSprite(coord);
     var m = this.moving.sprite;
+    var range = this.moving.range;
     if (this.coordsMatch(m.coord, coord)) {
       /* Auf die Figur clicken bedeutet passen. */
       this.moving.canMove = this.moving.canAttack = false;
@@ -745,11 +742,11 @@ var LGame = React.createClass({
       var ign = m.move.ignore ? m.move.ignore : {};
       var mp = this.findPathTo(m.coord, coord, ign);
       if (mp) {
-        if (mp.length > m.move.range + 1) {
-          this.animateMessage("Zu weit weg.");
+        if (mp.length > range + 1) {
+          this.animateMessage("Zu weit weg zum Fahren.");
         }
-        if (!this.moving.canMove) {
-          this.animateAbortAttack('Kein Fahren mehr möglich.');
+        else if (!this.moving.canMove) {
+          this.animateMessage('Kein Fahren mehr möglich.');
         }
         else {
           this.animateMove(m, mp);
@@ -817,19 +814,27 @@ var LGame = React.createClass({
         invisible = this.board.tiles[sp.coord.x][sp.coord.y].invisible;
       } while (sp.active != true || invisible);
 
-      this.moving = {
-        sprite: sp,
-        canMove: true,
-        canAttack: true,
-      };
+      this.setupTurn(sp);
       /* falls sp.play gesetzt ist, kann die Figure automatisch fahren */
       if (sp.play) {
-        this.showMessage("Der " + sp.name + " zieht jetzt.");
         this.doAutoPlay(sp);
       }
-      else {
-        this.showMessage("Was soll der " + sp.name + " machen?");
-      }
+    }
+  },
+  setupTurn: function (sp) {
+    this.moving = {
+      sprite: sp,
+      canMove: true,
+      canAttack: true,
+      range: sp.move.range <= 0 ?
+        Math.floor((Math.random() * (12 - 2) + 2)) :
+        sp.move.range,
+    };
+    if (sp.play) {
+      this.showMessage("Der " + sp.name + " zieht jetzt.");
+    }
+    else {
+      this.showMessage("Was soll der " + sp.name + " machen?");
     }
   },
   doAutoPlay: function (sp) {
@@ -1017,6 +1022,9 @@ var LGame = React.createClass({
             continue;
           }
         }
+        if (this.board.tiles[nc.x][nc.y].invisible) {
+          continue;
+        }
         /* Andere Figuren sind Hindernisse. Ausnahme ist das Ziel.
          * Wenn das Ziel eine Figur ist, so wird dies als
          * Angriff aufgefasst und es soll der Pfad zum Ziel
@@ -1056,7 +1064,7 @@ var LGame = React.createClass({
       <div className="LGame">
         <h1>L-Spiel</h1>
         <Message key={"a-message"} message={this.board.message} />
-        <TurnMessage key={"t-message"} turn={sp} />
+        <TurnMessage key={"t-message"} turn={this.moving} />
         <Board rows={this.board.rows} cols={this.board.cols} coordEvent={this.coordEvent} findElement={this.findElement} />
       </div>
     );
@@ -1075,7 +1083,8 @@ var Message = React.createClass({
 
 var TurnMessage = React.createClass({
   render: function () {
-    var sp = this.props.turn;
+    var moving = this.props.turn;
+    var sp = moving.sprite;
     var p = sp.pic ? sp.pic : p;
     return (
       <div className="turn-message">
@@ -1083,7 +1092,7 @@ var TurnMessage = React.createClass({
         <span key={"img-message"} className={sp.type}>
           <img src={"img/" + p} title={sp.name + " (" + sp.lives + ")"} />
         </span>
-        <span key={"turn-message-2"}>] ist am Zug</span>
+        <span key={"turn-message-2"}>] ist am Zug. Reichweite: {moving.range}</span>
       </div>
     );
   },
