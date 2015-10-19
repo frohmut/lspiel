@@ -339,7 +339,11 @@ var LGame = React.createClass({
     /* Die erste Figur fängt an. */
     board.turn = 0;
     var m = this.board.sprites[1];
-    this.board.moving = m;
+    this.moving = {
+      sprite: m,
+      canMove: true,
+      canAttack: true,
+    };
     this.board.message = "Was soll der " + m.name + " machen?";
 
     return {data: this.board };
@@ -387,6 +391,7 @@ var LGame = React.createClass({
     }
   },
   animateMove: function (moving, path) {
+    this.moving.canMove = false; /* nur einmal laufen pro Zug */
     this.openDoors(path);
     if (path.length > 1) {
       var m = moving;
@@ -411,6 +416,7 @@ var LGame = React.createClass({
     }
   },
   animateAttack: function (m, sprite) {
+    this.moving.canAttack = false; /* nur einmal attackieren pro Zug */
     this.board.message = "Der " + m.name + " greift den " + sprite.name + " an.";
     sprite.lives--;
     if (sprite.lives <= 0) {
@@ -445,10 +451,17 @@ var LGame = React.createClass({
   tryMoveTo: function (coord) {
     var didAnimate = false;
     var sp = this.coordsSprite(coord);
-    var m = this.board.moving;
-    if (sp !== null && m != sp && sp.type != "attack") {
+    var m = this.moving.sprite;
+    if (this.coordsMatch(m.coord, coord)) {
+      /* Auf die Figur clicken bedeutet passen. */
+      this.moving.canMove = this.moving.canAttack = false;
+    }
+    else if (sp !== null && m != sp && sp.type != "attack") {
+      if (!this.moving.canAttack) {
+        this.doAbortAttack('Kein Angriff mehr möglich.');
+      }
       /* Auf dem Feld steht schon jemand. Vielleicht als Angriff */
-      if (m.attack.area == 'XY' && (coord.x != m.coord.x && coord.y != m.coord.y)) {
+      else if (m.attack.area == 'XY' && (coord.x != m.coord.x && coord.y != m.coord.y)) {
         /* Normalerweise kann nicht angegriff werden, wenn X- oder
          * Y-Koordinate gleich ist. */
         this.doAbortAttack('Nicht in der gleichen Zeile/Spalte');
@@ -530,6 +543,9 @@ var LGame = React.createClass({
           if (!ps) {
             this.board.message = "Stein kann nicht verschoben werden.";
           }
+          if (!this.moving.canAttack) {
+            this.doAbortAttack('Kein Angriff mehr möglich.');
+          }
           else {
             this.board.tiles[coord.x][coord.y].block = null;
             this.board.tiles[stoneTo.x][stoneTo.y].block = "stone";
@@ -551,6 +567,9 @@ var LGame = React.createClass({
       if (mp) {
         if (mp.length > m.move.range + 1) {
           this.board.message = "Zu weit weg.";
+        }
+        if (!this.moving.canMove) {
+          this.doAbortAttack('Kein Fahren mehr möglich.');
         }
         else {
           this.animateMove(m, mp);
@@ -583,7 +602,6 @@ var LGame = React.createClass({
     this.receivedData();
   },
   endTurn: function () {
-    var sp;
     var humans = false;
     /* gibt es noch menschliche Mitspieler? */
     for (var i = 1; i < this.board.sprites.length; i++) {
@@ -597,20 +615,34 @@ var LGame = React.createClass({
       this.board.message = "Game Over!";
       return;
     }
-    do {
-      this.board.turn = (this.board.turn + 1) % (this.board.sprites.length - 1);
-      sp = this.board.sprites[this.board.turn + 1];
-    } while (sp.active != true);
 
-    this.board.moving = sp;
-
-    /* falls sp.play gesetzt ist, kann die Figure automatisch fahren */
-    if (sp.play) {
-      this.board.message = "Der " + sp.name + " zieht jetzt.";
-      this.doAutoPlay(sp);
+    var sp;
+    /* Darf noch ein Zug gemacht werden? */
+    if (this.moving.canMove || this.moving.canAttack) {
+      sp = this.moving.sprite;
+      this.board.message = "Was soll der " + sp.name + " machen?";
+      this.board.message = "Der " + sp.name + " kann noch " +
+        (this.moving.canMove ? "fahren." : "attackieren.");
     }
     else {
-      this.board.message = "Was soll der " + sp.name + " machen?";
+      do {
+        this.board.turn = (this.board.turn + 1) % (this.board.sprites.length - 1);
+        sp = this.board.sprites[this.board.turn + 1];
+      } while (sp.active != true);
+
+      this.moving = {
+        sprite: sp,
+        canMove: true,
+        canAttack: true,
+      };
+      /* falls sp.play gesetzt ist, kann die Figure automatisch fahren */
+      if (sp.play) {
+        this.board.message = "Der " + sp.name + " zieht jetzt.";
+        this.doAutoPlay(sp);
+      }
+      else {
+        this.board.message = "Was soll der " + sp.name + " machen?";
+      }
     }
   },
   doAutoPlay: function (sp) {
@@ -658,7 +690,8 @@ var LGame = React.createClass({
           this.runAction(sp, actions[1]);
         }
       }
-      this.runAction(sp, { action: "endturn" });
+      /* pass (in case there was an action (move/attack) left */
+      this.runAction(sp, { action: "pass/endturn" });
     }.bind(this);
     if (this.animation != -1) {
       this.pending.push(f);
@@ -669,10 +702,11 @@ var LGame = React.createClass({
   },
   runAction: function (sp, action) {
     var f = function () {
-      if (action.action == 'endturn') {
+      if (action.action == 'pass/endturn') {
         var tsp = this.board.sprites[this.board.turn + 1];
         /* falls sp noch am Zug wäre -> nächster bitte */
         if (tsp == sp) {
+          this.moving.canMove = this.moving.canAttack = false;
           this.endTurn();
         }
       }
@@ -702,12 +736,12 @@ var LGame = React.createClass({
   },
   actionMoveFrom: function (args) {
     var sp = this.board.tiles[args.from.x][args.from.y].sprite;
-    if (this.board.moving == sp) {
+    if (this.moving.sprite == sp) {
       this.actionClick(args.to);
     }
     else {
       this.actionInit();
-      this.board.message = "Der " + sp.name + " kann nicht. Der " + this.board.moving.name + " ist am Zug.";
+      this.board.message = "Der " + sp.name + " kann nicht. Der " + this.moving.sprite.name + " ist am Zug.";
       this.actionFinally();
     }
   },
@@ -716,7 +750,7 @@ var LGame = React.createClass({
     if (this.animation != -1) {
       this.board.message = "Warte auf Deinen Zug.";
     }
-    else if (this.board.moving) {
+    else {
       this.tryMoveTo(coord);
       this.endTurn();
     }
