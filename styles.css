@@ -40,6 +40,12 @@ img {
 .tile-north-D {
 	border-top: 1px solid brown;
 }
+
+.tile-invisible-true {
+	background: grey;
+	border: 1px solid darkgrey;
+}
+
 /* message area */
 .message {
 	height: 30px;
