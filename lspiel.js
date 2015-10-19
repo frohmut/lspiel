@@ -308,10 +308,25 @@ var LGame = React.createClass({
               x: z.coord.x,
               y: 0,
             };
-            var p = this.findPathTo(this.coord, target, { 'walls': true});
-            var zp = this.findPathTo(this.coord, z.coord, {});
-            if (zp && (z.coord.x == this.coord.x || z.coord.y == this.coord.y)) {
-              actions.push({action: "attack", coord: z.coord});
+            var p = this.findPathTo(this.coord, z.coord, { 'walls': true});
+            if (p && p.length == 2) {
+              actions = [ { action: "move", coord: {x: 2, y: 4}}];
+            }
+            else if (p) {
+              var enemyindex = 0;
+              var canAttack = false;
+              while (!canAttack) {
+                enemyindex = enemyindex + 1;
+                var pos = p[enemyindex];
+                if (pos.x == z.coord.x || pos.y == z.coord.y) {
+                  canAttack = true
+                  ;
+                }
+              }
+              actions = [
+                { action: "move", coord: p[enemyindex]},
+                { action: "attack", coord: z.coord },
+              ];
             }
             else if (p && p.length <= 8) {
               actions.push({action: "move", coord: target});
@@ -390,6 +405,19 @@ var LGame = React.createClass({
       }
     }
   },
+  animateAbortAttack: function (message) {
+    this.animateMessage("Angriff nicht möglich: " + message);
+  },
+  animateMessage: function (message) {
+    this.board.message = message;
+    this.animation = setTimeout(function () {
+      this.animation = -1;
+      if (this.pending.length > 0) {
+        var p = this.pending.shift();
+        p();
+      }
+    }.bind(this), 200);
+  },
   animateMove: function (moving, path) {
     this.moving.canMove = false; /* nur einmal laufen pro Zug */
     this.openDoors(path);
@@ -415,41 +443,43 @@ var LGame = React.createClass({
       }.bind(this), 200);
     }
   },
+  animateMoveStone: function (coord, stoneTo) {
+    this.moving.canAttack = false;
+    this.board.tiles[coord.x][coord.y].block = null;
+    this.board.tiles[stoneTo.x][stoneTo.y].block = "stone";
+  },
   animateAttack: function (m, sprite) {
     this.moving.canAttack = false; /* nur einmal attackieren pro Zug */
     this.board.message = "Der " + m.name + " greift den " + sprite.name + " an.";
-    sprite.lives--;
-    if (sprite.lives <= 0) {
-      sprite.active = false;
 
-      var att = this.board.sprites[0];
-      if (att.active == true) {
-        this.board.tiles[att.coord.x][att.coord.y].sprite = null;
-      }
-      att.active = true;
-      att.subtype = sprite.type;
-
-      this.board.tiles[sprite.coord.x][sprite.coord.y].sprite = this.board.sprites[0];
-      att.coord.x = sprite.coord.x;
-      att.coord.y = sprite.coord.y;
-      this.board.message = "Der " + sprite.name + " ist aus dem Spiel.";
-    }
-    else {
-      this.board.message = "Der " + sprite.name + " hat noch " + sprite.lives + " Leben";
-    }
-    this.animateSleep(2000);
-  },
-  animateSleep: function (ms) {
     this.animation = setTimeout(function () {
+      sprite.lives--;
+      if (sprite.lives <= 0) {
+        sprite.active = false;
+
+        var att = this.board.sprites[0];
+        if (att.active == true) {
+          this.board.tiles[att.coord.x][att.coord.y].sprite = null;
+        }
+        att.active = true;
+        att.subtype = sprite.type;
+
+        this.board.tiles[sprite.coord.x][sprite.coord.y].sprite = this.board.sprites[0];
+        att.coord.x = sprite.coord.x;
+        att.coord.y = sprite.coord.y;
+        this.board.message = "Der " + sprite.name + " ist aus dem Spiel.";
+      }
+      else {
+        this.board.message = "Der " + sprite.name + " hat noch " + sprite.lives + " Leben";
+      }
       this.animation = -1;
       if (this.pending.length > 0) {
         var p = this.pending.shift();
         p();
       }
-    }.bind(this), ms);
+    }.bind(this), 1000);
   },
   tryMoveTo: function (coord) {
-    var didAnimate = false;
     var sp = this.coordsSprite(coord);
     var m = this.moving.sprite;
     if (this.coordsMatch(m.coord, coord)) {
@@ -458,13 +488,13 @@ var LGame = React.createClass({
     }
     else if (sp !== null && m != sp && sp.type != "attack") {
       if (!this.moving.canAttack) {
-        this.doAbortAttack('Kein Angriff mehr möglich.');
+        this.animateAbortAttack('Kein Angriff mehr möglich.');
       }
       /* Auf dem Feld steht schon jemand. Vielleicht als Angriff */
       else if (m.attack.area == 'XY' && (coord.x != m.coord.x && coord.y != m.coord.y)) {
         /* Normalerweise kann nicht angegriff werden, wenn X- oder
          * Y-Koordinate gleich ist. */
-        this.doAbortAttack('Nicht in der gleichen Zeile/Spalte');
+        this.animateAbortAttack('Nicht in der gleichen Zeile/Spalte');
       }
       else {
         var ignoreObstacles = {};
@@ -481,11 +511,11 @@ var LGame = React.createClass({
         }
         var attackPath = this.findPathTo(sp.coord, m.coord, ignoreObstacles);
         if (!attackPath) {
-          this.doAbortAttack('Kein Pfad gefunden.');
+          this.animateAbortAttack('Kein Pfad gefunden.');
         }
         /* Reicht die Angriffs-Reichweite für den Pfad? */
         else if (attackPath.length > m.attack.reach + 1) {
-          this.doAbortAttack('Zu weit weg.');
+          this.animateAbortAttack('Zu weit weg.');
         }
         else {
           /* ist der Pfad entlang der X/Y-Richtung? */
@@ -493,8 +523,8 @@ var LGame = React.createClass({
           if (m.attack.area == 'XY') {
             var dir = coord.x == m.coord.x ? 'x' : 'y';
             for (var i = 0; i < attackPath.length; i++) {
-              if (attackPath[i][dir] != m.coord.x) {
-                this.doAbortAttack('Kein Pfad in der gleichen Zeile/Spalte');
+              if (attackPath[i][dir] != m.coord[dir]) {
+                this.animateAbortAttack('Kein Pfad in der gleichen Zeile/Spalte');
                 attackOK = false;
                 break;
               }
@@ -502,7 +532,6 @@ var LGame = React.createClass({
           }
           if (attackOK) {
             this.animateAttack(m, sp);
-            didAnimate = true;
           }
         }
       }
@@ -532,7 +561,7 @@ var LGame = React.createClass({
 
         var p = this.findPathTo(m.coord, to, {});
         if (!p) {
-          this.board.message = "Kein Pfad vor den Stein gefunden.";
+          this.animateMessage("Kein Pfad vor den Stein gefunden.");
         }
         else {
           var stoneTo = {
@@ -541,52 +570,47 @@ var LGame = React.createClass({
           };
           var ps = this.findPathTo(coord, stoneTo);
           if (!ps) {
-            this.board.message = "Stein kann nicht verschoben werden.";
+            this.animateMessage("Stein kann nicht verschoben werden.");
           }
           if (!this.moving.canAttack) {
-            this.doAbortAttack('Kein Angriff mehr möglich.');
+            this.animateAbortAttack('Kein Angriff mehr möglich.');
           }
           else {
-            this.board.tiles[coord.x][coord.y].block = null;
-            this.board.tiles[stoneTo.x][stoneTo.y].block = "stone";
+            this.animateMoveStone(coord, stoneTo);
           }
         }
       }
       /* X/Y passt nicht -> Feld ist blockiert */
       else {
-        this.board.message = "Dieses Feld ist blockiert.";
+        this.animateMessage("Dieses Feld ist blockiert.");
       }
     }
     /* anderes Hindernis */
     else if (this.board.tiles[coord.x][coord.y].block) {
-      this.board.message = "Dieses Feld ist blockiert.";
+      this.animateMessage("Dieses Feld ist blockiert.");
     }
     else {
       var ign = m.move.ignore ? m.move.ignore : null;
       var mp = this.findPathTo(m.coord, coord, ign);
       if (mp) {
         if (mp.length > m.move.range + 1) {
-          this.board.message = "Zu weit weg.";
+          this.board.animateMessage("Zu weit weg.");
         }
         if (!this.moving.canMove) {
-          this.doAbortAttack('Kein Fahren mehr möglich.');
+          this.animateAbortAttack('Kein Fahren mehr möglich.');
         }
         else {
           this.animateMove(m, mp);
-          didAnimate = true;
         }
       }
       else {
         if (this.board.tiles[coord.x][coord.y].block == "stone") {
-          this.board.message = "Dieses Feld ist blockiert.";
+          this.animateMessage("Dieses Feld ist blockiert.");
         }
         else {
-          this.board.message = "Keinen Weg gefunden.";
+          this.animateMessage("Keinen Weg gefunden.");
         }
       }
-    }
-    if (!didAnimate) {
-      this.animateSleep(2000);
     }
   },
   actionInit: function () {
@@ -602,17 +626,27 @@ var LGame = React.createClass({
     this.receivedData();
   },
   endTurn: function () {
-    var humans = false;
+    var humans = 0;
+    var robots = 0;
     /* gibt es noch menschliche Mitspieler? */
     for (var i = 1; i < this.board.sprites.length; i++) {
       var sph = this.board.sprites[i];
-      if (sph.active && !sph.play) {
-        humans = true;
-        break;
+      if (!sph.active) {
+        continue;
+      }
+      if (sph.play) {
+        robots++;
+      }
+      else {
+        humans++;
       }
     }
-    if (!humans) {
-      this.board.message = "Game Over!";
+    if (humans < 1) {
+      this.animateMessage("Game Over!");
+      return;
+    }
+    else if (robots < 1) {
+      this.animateMessage("You won!");
       return;
     }
 
@@ -620,9 +654,8 @@ var LGame = React.createClass({
     /* Darf noch ein Zug gemacht werden? */
     if (this.moving.canMove || this.moving.canAttack) {
       sp = this.moving.sprite;
-      this.board.message = "Was soll der " + sp.name + " machen?";
-      this.board.message = "Der " + sp.name + " kann noch " +
-        (this.moving.canMove ? "fahren." : "attackieren.");
+      this.animateMessage("Der " + sp.name + " kann noch " +
+        (this.moving.canMove ? "fahren." : "attackieren."));
     }
     else {
       do {
@@ -637,11 +670,11 @@ var LGame = React.createClass({
       };
       /* falls sp.play gesetzt ist, kann die Figure automatisch fahren */
       if (sp.play) {
-        this.board.message = "Der " + sp.name + " zieht jetzt.";
+        this.animateMessage("Der " + sp.name + " zieht jetzt.");
         this.doAutoPlay(sp);
       }
       else {
-        this.board.message = "Was soll der " + sp.name + " machen?";
+        this.animateMessage = "Was soll der " + sp.name + " machen?";
       }
     }
   },
@@ -680,7 +713,7 @@ var LGame = React.createClass({
     var f = function () {
 
       var actions = sp.play.call(player);
-  
+
       if (actions && actions.length) {
         /* es sind maximal 2 Aktionen erlaubt */
         if (actions.length > 0) {
@@ -711,7 +744,9 @@ var LGame = React.createClass({
         }
       }
       else if (action.action == 'endturn') {
-        this.endTurn();
+        if (tsp == sp) {
+          this.endTurn();
+        }
       }
       else {
         this.tryMoveTo(action.coord);
@@ -733,9 +768,6 @@ var LGame = React.createClass({
     else {
       f();
     }
-  },
-  doAbortAttack: function (message) {
-    this.board.message = "Angriff nicht möglich: " + message;
   },
   actionMoveFrom: function (args) {
     var sp = this.board.tiles[args.from.x][args.from.y].sprite;
