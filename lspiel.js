@@ -437,7 +437,7 @@ var LGame = React.createClass({
     else {
       this.board.message = "Der " + sprite.name + " hat noch " + sprite.lives + " Leben";
     }
-    this.animateSleep(1000);
+    this.animateSleep(2000);
   },
   animateSleep: function (ms) {
     this.animation = setTimeout(function () {
@@ -586,7 +586,7 @@ var LGame = React.createClass({
       }
     }
     if (!didAnimate) {
-      this.animateSleep(500);
+      this.animateSleep(2000);
     }
   },
   actionInit: function () {
@@ -702,13 +702,16 @@ var LGame = React.createClass({
   },
   runAction: function (sp, action) {
     var f = function () {
+      var tsp = this.board.sprites[this.board.turn + 1];
       if (action.action == 'pass/endturn') {
-        var tsp = this.board.sprites[this.board.turn + 1];
         /* falls sp noch am Zug wäre -> nächster bitte */
         if (tsp == sp) {
           this.moving.canMove = this.moving.canAttack = false;
           this.endTurn();
         }
+      }
+      else if (action.action == 'endturn') {
+        this.endTurn();
       }
       else {
         this.tryMoveTo(action.coord);
@@ -752,7 +755,7 @@ var LGame = React.createClass({
     }
     else {
       this.tryMoveTo(coord);
-      this.endTurn();
+      this.runAction(this.moving.sprite, { action: "endturn" });
     }
     this.actionFinally();
   },

@@ -6,10 +6,13 @@
 }
 /* each board-rows has #cols tiles */
 .tile {
-	width: 30px;
-	height: 30px;
+	width: 32px;
+	height: 32px;
 	background: blue;
 	border: 1px solid darkblue;
+}
+img {
+	margin: 1px;
 }
 /* representation of walls */
 .tile-north-W {
