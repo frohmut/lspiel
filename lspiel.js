@@ -79,10 +79,15 @@ var LGame = React.createClass({
       }
     }
   },
-  addBlocks: function (board, blocks) {
-    for (var i = 0; i < blocks.length; i++) {
-      var b = blocks[i];
-      board.tiles[b.x][b.y].block = b.type;
+  addBlocks: function (board, inBlocks) {
+    for (var i = 0; i < inBlocks.length; i++) {
+      var b = inBlocks[i];
+      board.blocks.push({
+        type: b.type,
+        pic: b.pic,
+        movable: b.movable ? true : false,
+      });
+      board.tiles[b.x][b.y].block = board.blocks[board.blocks.length - 1];
     }
   },
   addSprites: function (board, sprites) {
@@ -136,6 +141,7 @@ var LGame = React.createClass({
       message: "",
       tiles: {},
       sprites: [],
+      blocks: [],
       moving: null,
     };
 
@@ -232,9 +238,10 @@ var LGame = React.createClass({
         { x: 0, y: 1, dir: 'x' },
       ],
       blocks: [
-        { x: 3, y: 0, type: "stone" },
-        { x: 13, y: 2, type: "stone" },
-        { x: 5, y: 0, type: "stone" },
+        { x: 3, y: 0, type: "stone", pic: "mauer.png" },
+        { x: 13, y: 2, type: "stone", pic: "mauer.png" },
+        { x: 5, y: 0, type: "stone", pic: "mauer.png" },
+        { x: 3, y: 1, type: "table", pic: "tisch.png" },
       ],
       sprites: [
         {
@@ -416,7 +423,7 @@ var LGame = React.createClass({
         var p = this.pending.shift();
         p();
       }
-    }.bind(this), 200);
+    }.bind(this), 500);
   },
   animateMove: function (moving, path) {
     this.moving.canMove = false; /* nur einmal laufen pro Zug */
@@ -445,8 +452,9 @@ var LGame = React.createClass({
   },
   animateMoveStone: function (coord, stoneTo) {
     this.moving.canAttack = false;
+    var b = this.board.tiles[coord.x][coord.y].block;
     this.board.tiles[coord.x][coord.y].block = null;
-    this.board.tiles[stoneTo.x][stoneTo.y].block = "stone";
+    this.board.tiles[stoneTo.x][stoneTo.y].block = b;
   },
   animateAttack: function (m, sprite) {
     this.moving.canAttack = false; /* nur einmal attackieren pro Zug */
@@ -477,7 +485,7 @@ var LGame = React.createClass({
         var p = this.pending.shift();
         p();
       }
-    }.bind(this), 1000);
+    }.bind(this), 500);
   },
   tryMoveTo: function (coord) {
     var sp = this.coordsSprite(coord);
@@ -537,7 +545,8 @@ var LGame = React.createClass({
       }
     }
     /* Stein */
-    else if (this.board.tiles[coord.x][coord.y].block == "stone") {
+    else if (this.board.tiles[coord.x][coord.y].block
+             && this.board.tiles[coord.x][coord.y].block.type == "stone") {
       /* auch ein Stein kann angegriffen werden, wenn X/Y
        * mit der eigenen Position übereinstimmt
        */
@@ -590,11 +599,11 @@ var LGame = React.createClass({
       this.animateMessage("Dieses Feld ist blockiert.");
     }
     else {
-      var ign = m.move.ignore ? m.move.ignore : null;
+      var ign = m.move.ignore ? m.move.ignore : {};
       var mp = this.findPathTo(m.coord, coord, ign);
       if (mp) {
         if (mp.length > m.move.range + 1) {
-          this.board.animateMessage("Zu weit weg.");
+          this.animateMessage("Zu weit weg.");
         }
         if (!this.moving.canMove) {
           this.animateAbortAttack('Kein Fahren mehr möglich.');
@@ -604,7 +613,7 @@ var LGame = React.createClass({
         }
       }
       else {
-        if (this.board.tiles[coord.x][coord.y].block == "stone") {
+        if (this.board.tiles[coord.x][coord.y].block) {
           this.animateMessage("Dieses Feld ist blockiert.");
         }
         else {
@@ -650,6 +659,7 @@ var LGame = React.createClass({
       return;
     }
 
+    this.animateMessage("test");
     var sp;
     /* Darf noch ein Zug gemacht werden? */
     if (this.moving.canMove || this.moving.canAttack) {
@@ -674,7 +684,7 @@ var LGame = React.createClass({
         this.doAutoPlay(sp);
       }
       else {
-        this.animateMessage = "Was soll der " + sp.name + " machen?";
+        this.animateMessage("Was soll der " + sp.name + " machen?");
       }
     }
   },
@@ -858,8 +868,8 @@ var LGame = React.createClass({
         }
         visited[nc.x + "/" + nc.y] = true;
 
-        if (this.board.tiles[nc.x][nc.y].block == "stone") {
-          if (!ignore.stones) {
+        if (this.board.tiles[nc.x][nc.y].block) {
+          if (this.board.tiles[nc.x][nc.y].block.type != "stone" || !ignore.stones) {
             continue;
           }
         }
@@ -948,18 +958,15 @@ var Pic = React.createClass({
       );
     }
     else if (tile.block) {
-      if (tile.block == 'stone') {
-        return (
-          <span key={key} className="stone">
-            <img src="img/mauer.png" />
-          </span>
-        );
+      var bp = "mauer.png";
+      if (tile.block.pic) {
+        bp = tile.block.pic;
       }
-      else {
-        return (
-          <span key={key}>?</span>
-        );
-      }
+      return (
+        <span key={key} className="stone">
+          <img src={"img/" + bp} />
+        </span>
+      );
     }
     else if (sp.type == "attack") {
       if (sp.subtype == "hero") {
