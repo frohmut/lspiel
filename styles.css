@@ -1,3 +1,9 @@
+.level-container {
+  display: flex;
+	flex-direction: row;
+	height: 50px;
+}
+
 /* the board consists for rows */
 .tileRow {
 	display: flex;
@@ -38,7 +44,7 @@ img {
 	border-bottom: 1px solid brown;
 }
 .tile-north-D {
-	border-top: 1px solid brown;
+	border-bottom: 1px solid brown;
 }
 
 .tile-invisible-true {
@@ -47,10 +53,21 @@ img {
 }
 
 /* message area */
+.message-row {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	width: 800px;
+	margin: 5px;
+}
 .message {
-	height: 30px;
 }
 .turn-message {
 	display: flex;
 	align-items: center;
+}
+
+button {
+	margin: 5px;
 }
