@@ -35,16 +35,16 @@ img {
 }
 /* rep. of closed doors */
 .tile-east-D {
-	border-right: 1px solid brown;
+	border-right: 1px solid red;
 }
 .tile-west-D {
-	border-left: 1px solid brown;
+	border-left: 1px solid red;
 }
 .tile-south-D {
-	border-bottom: 1px solid brown;
+	border-bottom: 1px solid red;
 }
 .tile-north-D {
-	border-top: 1px solid brown;
+	border-top: 1px solid red;
 }
 
 .tile-invisible-true {

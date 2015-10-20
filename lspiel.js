@@ -104,13 +104,15 @@ var LGame = React.createClass({
         active: true,
         lifes: s.lifes ? s.lifes : 1,
         move: {
-          range: s.range ? s.range : 1,
+          range: s.range ? s.range : s.type == "player" ? -1 : 1,
           ignore: s.ignoreObstacles ? s.ignoreObstacles :
                     s.type == "hero" ? { doors: true} : null,
         },
         attack: {
           area: s.attackArea ? s.attackArea : 'XY',
           reach: s.reach ? s.reach : 1,
+          power: s.power ? s.power : 6,
+          defence: s.defence ? s.defence : s.type == "player" ? 3 : 1,
         },
         pic: s.pic ? s.pic : null,
         play: s.play ? s.play : null,
@@ -379,6 +381,16 @@ var LGame = React.createClass({
             attackArea: 'everywhere',
             pic: "gargoyle.png",
           },
+          {
+            x: 15, y: 8,
+            name: "Ninja", type: "hero",
+            lifes: 5,
+            range: 10000,
+            attackArea: 'everywhere',
+            pic: "ninja.png",
+            power: 10,
+            defence: 4,
+          },
         ],
       },
       "magnusGold": {
@@ -427,6 +439,7 @@ var LGame = React.createClass({
             y: 14, x: 19,
             name: "Barbar", type: "hero",
             lifes: 8,
+            range: -1,
             pic: "gf.png",
           },
           stdGoblin(15, 22),
@@ -664,7 +677,6 @@ var LGame = React.createClass({
   },
   showMessage: function (message) {
     this.board.message = message;
-    this.actionFinally();
   },
   animateMessage: function (message) {
     this.board.message = message;
@@ -717,11 +729,8 @@ var LGame = React.createClass({
     this.updateMoving("attack");
     this.board.message = "Der " + m.name + " greift den " + sprite.name + " an.";
 
-    var hit = 6 * Math.random();
-    var defend = Math.random();
-    if (m.type == "hero") {
-      defend *= 3;
-    }
+    var hit = Math.random() * 6 * m.attack.power;
+    var defend = Math.random() * m.attack.defence;
     if (hit < defend) {
       this.board.message = "Der " + sprite.name + " hat abgewehrt.";
     }
@@ -936,11 +945,13 @@ var LGame = React.createClass({
       }
     }
     if (humans < 1) {
-      this.showMessage("Verlogen!");
+      this.showMessage("Verloren!");
+      this.actionFinally();
       return;
     }
     else if (robots < 1) {
       this.showMessage("Gewonnen!");
+      this.actionFinally();
       return;
     }
 
@@ -954,8 +965,6 @@ var LGame = React.createClass({
     /* Darf noch ein Zug gemacht werden? */
     if (this.moving.canMove || this.moving.canAttack) {
       sp = this.moving.sprite;
-      this.showMessage("Der " + sp.name + " kann noch " +
-        (this.moving.canMove ? "fahren." : "attackieren."));
     }
     else {
       var invisible = false;
@@ -971,6 +980,7 @@ var LGame = React.createClass({
         this.doAutoPlay(sp);
       }
     }
+    this.actionFinally();
   },
   updateMoving: function (actionName) {
     if (actionName == "move") {
@@ -1001,12 +1011,6 @@ var LGame = React.createClass({
       range: 0,
     };
     this.moving.range = this.moving.origRange;
-    if (sp.play) {
-      this.showMessage("Der " + sp.name + " zieht jetzt.");
-    }
-    else {
-      this.showMessage("Was soll der " + sp.name + " machen?");
-    }
   },
   doAutoPlay: function (sp) {
     var game = this;
@@ -1352,7 +1356,8 @@ var TurnMessage = React.createClass({
         <span key={"img-message"} className={sp.type}>
           <img src={"img/" + p} title={sp.name + " (" + sp.lifes + ")"} />
         </span>
-        <span key={"turn-message-2"}>] ist am Zug. Reichweite: {moving.range}. Leben: {sp.lifes}</span>
+        <span key={"turn-message-2"}>] ist am Zug. Reichweite: {moving.range}.
+        {moving.canAttack ? " Kann" : " Kann nicht "} angreifen. Leben: {sp.lifes}</span>
       </div>
     );
   },
