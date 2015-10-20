@@ -86,7 +86,7 @@ var LGame = React.createClass({
         type: b.type,
         pic: b.pic,
         movable: b.movable ? true : false,
-        attackable: b.attackable ? b.attackable : "",
+        attackable: b.attackable ? b.attackable : null,
       });
       board.tiles[b.x][b.y].block = board.blocks[board.blocks.length - 1];
     }
@@ -102,9 +102,9 @@ var LGame = React.createClass({
         name: s.name,
         type: s.type,
         active: true,
-        lives: s.lives ? s.lives : 1,
+        lifes: s.lifes ? s.lifes : 1,
         move: {
-          range: s.range ? s.range : -1,
+          range: s.range ? s.range : 1,
           ignore: s.ignoreObstacles ? s.ignoreObstacles :
                     s.type == "hero" ? { doors: true} : null,
         },
@@ -164,7 +164,7 @@ var LGame = React.createClass({
       name: "attack1",
       type: "attack",
       active: false,
-      lives: 0,
+      lifes: 0,
     };
 
     return board;
@@ -249,6 +249,10 @@ var LGame = React.createClass({
       else if (p.length == 1) {
         actions.push({action: "attack", coord: p[0]});
       }
+      else if (p.length > this.range + 1) {
+        var to = p[this.range];
+        actions.push({action: "move", coord: to});
+      }
       else {
         var theHero = p[p.length - 1];
         var atHero = p[p.length - 2];
@@ -256,6 +260,20 @@ var LGame = React.createClass({
         actions.push({action: "attack", coord: theHero});
       }
       return actions;
+    };
+    var stdOrc = function (y, x) {
+      return {
+        y: y, x: x,
+        name: "Orc", type: "monster", range: 8,
+        pic: "orc.png", play: stdAutoPlay,
+      };
+    };
+    var stdGoblin = function (y, x) {
+      return {
+        y: y, x: x,
+        name: "Goblin", type: "monster", range: 10,
+        pic: "goblin.png", play: stdAutoPlay,
+      };
     };
     var levels = {
       "example": {
@@ -272,33 +290,38 @@ var LGame = React.createClass({
           {
             x: 3, y: 2,
             name: "Barbar", type: "hero",
-            lives: 8,
+            range: 100,
+            lifes: 8,
             pic: "gf.png",
           },
           {
             x: 0, y: 2,
             name: "Zwerg", type: "hero",
-            lives: 7, reach: 1,
+            range: 100,
+            lifes: 7, reach: 1,
             pic: "zwerg.png",
           },
           {
             x: 2, y: 0,
             name: "Goblin", type: "monster",
             pic: "goblin.png",
+            range: 100,
             play: stdAutoPlay,
 
           },
           {
             x: 25, y: 0,
             name: "Alb", type: "hero",
-            lives: 6,
+            lifes: 6,
+            range: 100,
             attackArea: 'path',
             pic: "alb.png",
           },
           {
             x: 23, y: 0,
             name: "Zauberer", type: "hero",
-            lives: 4,
+            lifes: 4,
+            range: 100,
             attackArea: 'everywhere',
             pic: "zauberer.png",
           },
@@ -351,7 +374,8 @@ var LGame = React.createClass({
           {
             x: 12, y: 9,
             name: "Gargoyle", type: "monster",
-            lives: 2,
+            lifes: 2,
+            range: 100,
             attackArea: 'everywhere',
             pic: "gargoyle.png",
           },
@@ -376,41 +400,55 @@ var LGame = React.createClass({
           { y: 17, x: 23, dir: 'y'},
         ],
         blocks: [
-          { y: 17, x: 13, type: "stone", pic: "mauer.png"},
+          { y: 17, x: 13, type: "stone", pic: "mauer.png", attackable: "move"},
           { y: 17, x: 12, type: "stone", pic: "mauer.png"},
           { y: 18, x: 1, type: "stone", pic: "mauer.png", attackable: "move"},
           { y: 16, x: 1, type: "table", pic: "tisch.png" },
           { y: 15, x: 1, type: "table", pic: "tisch.png" },
           { y: 16, x: 2, type: "table", pic: "tisch.png" },
           { y: 15, x: 2, type: "table", pic: "tisch.png" },
+          { y: 9, x: 1, type: "stone", pic: "mauer.png", attackable: "move"},
+          { y: 9, x: 9, type: "stone", pic: "mauer.png" },
+          { y: 6, x: 11, type: "stone", pic: "mauer.png", attackable: "move" },
+          { y: 6, x: 14, type: "stone", pic: "mauer.png", attackable: "move" },
+          { y: 3, x: 12, type: "stone", pic: "mauer.png", attackable: "move" },
+          { y: 3, x: 13, type: "stone", pic: "mauer.png", attackable: "move" },
+          { y: 0, x: 11, type: "stone", pic: "mauer.png", attackable: "move" },
+          { y: 10, x: 16, type: "stone", pic: "mauer.png", attackable: "move" },
+          { y: 9, x: 25, type: "stone", pic: "mauer.png", attackable: "move" },
+          { y: 18, x: 24, type: "stone", pic: "mauer.png" },
+          { y: 2, x: 11, type: "stone", pic: "mauer.png", attackable: "move" },
+          { y: 11, x: 10, type: "table", pic: "tisch.png", attackable: "destroy" },
+          { y: 8, x: 10, type: "table", pic: "tisch.png", attackable: "destroy" },
+          { y: 7, x: 11, type: "table", pic: "tisch.png", attackable: "destroy" },
         ],
         sprites: [
           {
             y: 14, x: 19,
             name: "Barbar", type: "hero",
-            lives: 8,
+            lifes: 8,
             pic: "gf.png",
           },
+          stdGoblin(15, 22),
+          stdGoblin(16, 23),
+          stdOrc(18, 3),
+          stdOrc(16, 3),
+          stdOrc(16, 4),
+          stdOrc(11, 2),
+          stdOrc(8, 23),
+          stdOrc(8, 21),
+          stdOrc(7, 22),
+          stdOrc(9, 16),
+          stdOrc(8, 12),
+          stdOrc(10, 12),
           {
-            y: 15, x: 22, name: "Goblin", type: "monster", range: 10,
-            pic: "goblin.png", play: stdAutoPlay,
+            y: 9, x: 12,
+            name: "Gargoyle", type: "monster", pic: "gargoyle.png",
+            range: 6,
+            lifes: 2,
+            play: stdAutoPlay,
           },
-          {
-            y: 16, x: 23, name: "Goblin", type: "monster", range: 10,
-            pic: "goblin.png", play: stdAutoPlay,
-          },
-          {
-            y: 18, x: 3, name: "Orc", type: "monster", range: 8,
-            pic: "orc.png", play: stdAutoPlay,
-          },
-          {
-            y: 16, x: 3, name: "Orc", type: "monster", range: 8,
-            pic: "orc.png", play: stdAutoPlay,
-          },
-          {
-            y: 16, x: 4, name: "Orc", type: "monster", range: 8,
-            pic: "orc.png", play: stdAutoPlay,
-          },
+          stdOrc(9, 12),
         ],
       },
     };
@@ -679,38 +717,46 @@ var LGame = React.createClass({
     this.updateMoving("attack");
     this.board.message = "Der " + m.name + " greift den " + sprite.name + " an.";
 
+    var hit = 6 * Math.random();
+    var defend = Math.random();
+    if (m.type == "hero") {
+      defend *= 3;
+    }
+    if (hit < defend) {
+      this.board.message = "Der " + sprite.name + " hat abgewehrt.";
+    }
+    else if (sprite.lifes <= 1) {
+      sprite.active = false;
+
+      var att = this.board.sprites[0];
+      if (att.active == true) {
+        this.board.tiles[att.coord.x][att.coord.y].sprite = null;
+      }
+      att.active = true;
+      att.subtype = sprite.type;
+
+      this.board.tiles[sprite.coord.x][sprite.coord.y].sprite = this.board.sprites[0];
+      att.coord.x = sprite.coord.x;
+      att.coord.y = sprite.coord.y;
+      this.board.message = "Der " + sprite.name + " ist aus dem Spiel.";
+    }
+    else {
+      sprite.lifes--;
+      this.board.message = "Der " + sprite.name + " hat noch " + sprite.lifes + " Leben";
+    }
+
     this.animation = setTimeout(function () {
-      sprite.lives--;
-      if (sprite.lives <= 0) {
-        sprite.active = false;
-
-        var att = this.board.sprites[0];
-        if (att.active == true) {
-          this.board.tiles[att.coord.x][att.coord.y].sprite = null;
-        }
-        att.active = true;
-        att.subtype = sprite.type;
-
-        this.board.tiles[sprite.coord.x][sprite.coord.y].sprite = this.board.sprites[0];
-        att.coord.x = sprite.coord.x;
-        att.coord.y = sprite.coord.y;
-        this.board.message = "Der " + sprite.name + " ist aus dem Spiel.";
-      }
-      else {
-        this.board.message = "Der " + sprite.name + " hat noch " + sprite.lives + " Leben";
-      }
       this.animation = -1;
       if (this.pending.length > 0) {
         var p = this.pending.shift();
         p();
       }
-    }.bind(this), 500);
+    }.bind(this), 2000);
   },
   attackThing: function (m, coord, attackF) {
     if (!this.moving.canAttack) {
       this.animateAbortAttack('Kein Angriff mehr möglich.');
     }
-    /* Auf dem Feld steht schon jemand. Vielleicht als Angriff */
     else if (m.attack.area == 'XY' && (coord.x != m.coord.x && coord.y != m.coord.y)) {
       /* Normalerweise kann nicht angegriff werden, wenn X- oder
        * Y-Koordinate gleich ist. */
@@ -890,15 +936,21 @@ var LGame = React.createClass({
       }
     }
     if (humans < 1) {
-      this.showMessage("Game Over!");
+      this.showMessage("Verlogen!");
       return;
     }
     else if (robots < 1) {
-      this.showMessage("You win!");
+      this.showMessage("Gewonnen!");
       return;
     }
 
     var sp;
+    if (!this.moving.canMove && this.moving.canAttack) {
+        /* kann die Figur wirklich noch attackieren? */
+      if (!this.findAttackable(this.moving)) {
+        this.updateMoving("pass");
+      }
+    }
     /* Darf noch ein Zug gemacht werden? */
     if (this.moving.canMove || this.moving.canAttack) {
       sp = this.moving.sprite;
@@ -928,9 +980,9 @@ var LGame = React.createClass({
       }
     }
     else if (actionName == "attack") {
-      this.canAttack = false;
+      this.moving.canAttack = false;
       if (this.moving.range != this.moving.origRange) {
-        this.canMove = false;
+        this.moving.canMove = false;
       }
     }
     else if (actionName == "pass") {
@@ -965,6 +1017,7 @@ var LGame = React.createClass({
         x: sp.coord.x,
         y: sp.coord.y,
       },
+      range: sp.move.range,
       findEnemy: function (name) {
         for (var i = 0; i < game.board.sprites.length; i++) {
           if (game.board.sprites[i].name == name) {
@@ -1087,6 +1140,51 @@ var LGame = React.createClass({
    * zurückliefert.
    * */
   findPath: function (from, ignoreObstacles, match) {
+    return this.findFrom(from, ignoreObstacles, {
+      found: match,
+    });
+  },
+  findAttackable: function (movable) {
+    if (movable.sprite.attack.area == 'everywhere') {
+      return true;
+    }
+    var sp = movable.sprite;
+    var board = this.board;
+    var p = this.findFrom(movable.sprite.coord, {}, {
+      found: function (coord) {
+        if (sp.coord.x == coord.x && sp.coord.y == coord.y) {
+          return false;
+        }
+        if (sp.area == 'XY') {
+          if (sp.coord.x != coord.x && sp.coord.y != coord.y) {
+            return false;
+          }
+        }
+        var tile = board.tiles[coord.x][coord.y];
+        if (tile.sprite && tile.sprite.active) {
+          return true;
+        }
+        else if (tile.block && tile.block.attackable) {
+          return true;
+        }
+        return false;
+      },
+      dontExpand: function (p) {
+        if (p.length - 1 >= sp.attack.reach) {
+          return true;
+        }
+        if (sp.area == 'XY') {
+          var coord = p[p.length - 1];
+          if (sp.coord.x != coord.x && sp.coord.y != coord.y) {
+            return true;
+          }
+        }
+        return false;
+      },
+    });
+    return p ? true : false;
+  },
+  findFrom: function (from, ignoreObstacles, stop) {
     var qp = []; /* queue of paths */
     qp.push([from]);
     var ignore = ignoreObstacles ? ignoreObstacles : {};
@@ -1100,9 +1198,12 @@ var LGame = React.createClass({
       var p = qp.shift();
       var c = p[p.length - 1];
 
-      if (match(c)) {
+      if (stop.found(c)) {
         found = p;
         break;
+      }
+      if (stop.dontExpand && stop.dontExpand(p)) {
+        continue;
       }
       var walls = this.board.tiles[c.x][c.y];
       for (var k in { 'north': 1, 'east': 1, 'south': 1, 'west': 1 }) {
@@ -1151,7 +1252,7 @@ var LGame = React.createClass({
          * */
         if (this.board.tiles[nc.x][nc.y].sprite) {
           if (this.board.tiles[nc.x][nc.y].sprite.active) {
-            if (!match(nc)) {
+            if (!stop.found(nc)) {
               if (!ignore.sprites) {
                 continue;
               }
@@ -1206,7 +1307,7 @@ var ChooseLevel = React.createClass({
     for (var i = 0; i < this.props.levelinfo.levels.length; i++) {
       var l = this.props.levelinfo.levels[i];
       levels.push(
-        <option value={l.level}>{l.name}</option>
+        <option key={i} value={l.level}>{l.name}</option>
       );
     }
     return (
@@ -1249,9 +1350,9 @@ var TurnMessage = React.createClass({
       <div className="turn-message">
         <span key={"turn-message-1"}>Der {sp.name} [</span>
         <span key={"img-message"} className={sp.type}>
-          <img src={"img/" + p} title={sp.name + " (" + sp.lives + ")"} />
+          <img src={"img/" + p} title={sp.name + " (" + sp.lifes + ")"} />
         </span>
-        <span key={"turn-message-2"}>] ist am Zug. Reichweite: {moving.range}</span>
+        <span key={"turn-message-2"}>] ist am Zug. Reichweite: {moving.range}. Leben: {sp.lifes}</span>
       </div>
     );
   },
@@ -1303,7 +1404,7 @@ var Pic = React.createClass({
       }
       return (
         <span key={key} className={sp.type}>
-          <img src={"img/" + p} title={sp.name + " (" + sp.lives + ")"} />
+          <img src={"img/" + p} title={sp.name + " (" + sp.lifes + ")"} />
         </span>
       );
     }

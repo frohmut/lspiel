@@ -12,7 +12,7 @@ browserify({})
   .pipe(fs.createWriteStream("bundle.js"))
 ;
 
-/* render initial state as html */ 
+/* render initial state as html */
 require('babel/register');
 var React = require('react');
 var ReactDOM = require('react-dom/server');

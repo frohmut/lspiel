@@ -11,7 +11,7 @@
   "scripts": {
     "test": "node_modules/.bin/eslint -c .eslintrc lspiel.js compile.js"
   },
-  "devDependencies": {
+  "dependencies": {
     "eslint": "latest",
     "eslint-plugin-react": "latest",
     "react": ">=0.14",
